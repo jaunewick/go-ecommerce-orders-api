@@ -69,13 +69,13 @@ func (r *RedisRepo) FindByID(ctx context.Context, id uint64) (model.Order, error
     return order, nil
 }
 
-func (r *redisRepo) DeleteByID(ctx context.Context, id uint64) error {
+func (r *RedisRepo) DeleteByID(ctx context.Context, id uint64) error {
     key := orderIDKey(id)
 
     // Use a transaction to ensure that the order is deleted and removed from the set of all orders
     txn := r.Client.TxPipeline()
 
-    err := txn.Del(ctx, key)
+    err := txn.Del(ctx, key).Err()
     if errors.Is(err, redis.Nil) {
         txn.Discard()
         return ErrNotExist
@@ -127,7 +127,7 @@ type FindResult struct {
 }
 
 func (r *RedisRepo) FindAll(ctx context.Context, page FindAllPage) (FindResult, error) {
-    res := r.Client.SScan(ctx, "orders", page.Offset, "*", pint64(page.Size))
+    res := r.Client.SScan(ctx, "orders", page.Offset, "*", int64(page.Size))
 
     keys, cursor, err := res.Result()
     if err != nil {
