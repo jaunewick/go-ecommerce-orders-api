@@ -117,8 +117,8 @@ func (r *RedisRepo) Update(ctx context.Context, order model.Order) error {
 
 // FindAllPage represents the pagination parameters for FindAll
 type FindAllPage struct {
-    Size   int
-    Offset int
+    Size   uint64
+    Offset uint64
 }
 
 type FindResult struct {
