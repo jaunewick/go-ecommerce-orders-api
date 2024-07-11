@@ -42,7 +42,7 @@ func (a *App) Start(ctx context.Context) error {
         }
     }()
 
-    fmt.Printf("Server listening on %s\n", server.Addr)
+    fmt.Printf("Server listening on port %s\n", server.Addr)
 
     // Create a channel to listen for errors from the server
     ch := make(chan error, 1)

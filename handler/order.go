@@ -2,12 +2,14 @@ package handler
 
 import (
     "encoding/json"
+    "errors"
     "fmt"
     "math/rand"
     "net/http"
     "time"
     "strconv"
 
+    "github.com/go-chi/chi/v5"
     "github.com/google/uuid"
 
     "github.com/Daniel-Giao/orders-api/model"
@@ -98,13 +100,122 @@ func (o *Order) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *Order) GetByID(w http.ResponseWriter, r *http.Request) {
-    fmt.Printf("Get an order by ID\n")
+    idParam := chi.URLParam(r, "id")
+
+    const base = 10
+    const bitSize = 64
+
+    orderID, err := strconv.ParseUint(idParam, base, bitSize)
+    if err != nil {
+        w.WriteHeader(http.StatusBadRequest)
+        return
+    }
+
+    odr, err := o.Repo.FindByID(r.Context(), orderID)
+    if errors.Is(err, order.ErrNotExist) {
+        w.WriteHeader(http.StatusNotFound)
+        return
+    } else if err != nil {
+        fmt.Printf("Error finding order by ID: %v\n", err)
+        w.WriteHeader(http.StatusInternalServerError)
+        return
+    }
+
+    if err := json.NewEncoder(w).Encode(odr); err != nil {
+        fmt.Printf("Error encoding order: %v\n", err)
+        w.WriteHeader(http.StatusInternalServerError)
+        return
+    }
 }
 
 func (o *Order) UpdateByID(w http.ResponseWriter, r *http.Request) {
-    fmt.Printf("Update an order by ID\n")
+    var body struct {
+        Status string `json:"status"`
+    }
+
+    if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+        w.WriteHeader(http.StatusBadRequest)
+        return
+    }
+
+    idParam := chi.URLParam(r, "id")
+
+    const base = 10
+    const bitSize = 64
+
+    orderID, err := strconv.ParseUint(idParam, base, bitSize)
+    if err != nil {
+        w.WriteHeader(http.StatusBadRequest)
+        return
+    }
+
+    odr, err := o.Repo.FindByID(r.Context(), orderID)
+    if errors.Is(err, order.ErrNotExist) {
+        w.WriteHeader(http.StatusNotFound)
+        return
+    } else if err != nil {
+        fmt.Printf("Error finding order by ID: %v\n", err)
+        w.WriteHeader(http.StatusInternalServerError)
+        return
+    }
+
+    const completedStatus = "completed"
+    const shippedStatus = "shipped"
+    now := time.Now().UTC()
+
+    switch body.Status {
+    case shippedStatus:
+        if odr.ShippedAt == nil {
+            w.WriteHeader(http.StatusBadRequest)
+            return
+        }
+        odr.ShippedAt = &now
+    case completedStatus:
+        if odr.CompletedAt == nil || odr.ShippedAt == nil {
+            w.WriteHeader(http.StatusBadRequest)
+            return
+        }
+        odr.CompletedAt = &now
+    default:
+        w.WriteHeader(http.StatusBadRequest)
+        return
+    }
+
+    err = o.Repo.Update(r.Context(), odr)
+    if err != nil {
+        fmt.Printf("Error updating order: %v\n", err)
+        w.WriteHeader(http.StatusInternalServerError)
+        return
+    }
+
+    if err := json.NewEncoder(w).Encode(odr); err != nil {
+        fmt.Printf("Error encoding order: %v\n", err)
+        w.WriteHeader(http.StatusInternalServerError)
+        return
+    }
 }
 
 func (o *Order) DeleteByID(w http.ResponseWriter, r *http.Request) {
-    fmt.Printf("Delete an order by ID\n")
+    idParam := chi.URLParam(r, "id")
+
+    const base = 10
+    const bitSize = 64
+
+    orderID, err := strconv.ParseUint(idParam, base, bitSize)
+    if err != nil {
+        w.WriteHeader(http.StatusBadRequest)
+        return
+    }
+
+    err = o.Repo.DeleteByID(r.Context(), orderID)
+    if errors.Is(err, order.ErrNotExist) {
+        w.WriteHeader(http.StatusNotFound)
+        return
+    } else if err != nil {
+        fmt.Printf("Error deleting order by ID: %v\n", err)
+        w.WriteHeader(http.StatusInternalServerError)
+        return
+    }
+
+    w.WriteHeader(http.StatusNoContent)
 }
